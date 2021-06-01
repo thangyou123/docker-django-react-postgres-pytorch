@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM python:3.4
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
