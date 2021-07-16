@@ -400,17 +400,23 @@ def Chat(text):
 	t=approvereject(text)
 	z=False
 	u='NuLL'
+
 	for i in ['S','s','L','l','m','M']:
 		for item in text.split():
 			if item==i:
 				u=i
 				z=True
 	if t=='Hello':
+	
 		return 'Dạ shop chào chị ạ chị muốn tư vấn sản phẩm nào ạ'
+	elif t=='Other':
+		return 'Dạ xin lỗi em chưa hiểu ý chị ạ'
 	elif  z:
 		t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
 		name=t2[len(t2)-1]['Name']
 		ConversationModel.objects.filter(Name=name).update(Size=u)
 		return "Dạ chị chọn size "+ u + " ạ."
+
+	
 	else:
 		return predict(text)
