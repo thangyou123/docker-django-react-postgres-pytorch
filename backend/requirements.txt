@@ -1,0 +1,12 @@
+Django==3.2.4
+psycopg2-binary>=2.8
+djangorestframework==3.12.4
+psycopg2==2.8.5
+django-cors-headers
+bogo
+regex
+pandas
+joblib
+scikit-learn==0.22.2.post1
+underthesea
+Pillow
