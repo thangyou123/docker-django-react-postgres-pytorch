@@ -5,7 +5,6 @@ import Chatlist from './components/Chatlist';
 import axios from 'axios';
 import FormData from 'form-data';
 import { v4 as uuidv4 } from 'uuid';
-import Image  from './components/Image';
 function App(){
 
 const [todolist,setTodoList]=useState([]);
@@ -22,9 +21,8 @@ const l=response.data.length;
 
 for (var i=0;i<l;i++){
   
-   newState[i]={id:uuidv4() , input: response.data[i]['text'],output: response.data[i]['text2'] };
+   newState[i]={id:uuidv4() , input: response.data[i]['text'],output: response.data[i]['text2'],ima: response.data[i]['url'] };
 } 
-
 
 setTodoList(newState);  
 
@@ -34,6 +32,53 @@ setTodoList(newState);
 const TextInputChange=(e)=>{
     setTextInput(e.target.value);
 };
+
+const addTT=()=>{
+    axios({
+        method: "get",
+        url: "http://127.0.0.1:8000/api/MyAPI/",
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    }).then(function(response){
+    const l=response.data.length;  
+    
+    setTodoList([...todolist,{id:uuidv4() , input: response.data[l-1]['text'],output: response.data[l-1]['text2'],ima: response.data[l-1]['url'] }]);  
+    })
+
+
+};
+
+
+const addFile=event=> {
+    if (event.target.files && event.target.files[0]){
+    var formData = new FormData();
+    formData.append("image", event.target.files[0]);
+    formData.append('csrfmiddlewaretoken', "OnhW2ZICT2oIz2Zv1S07QfPL2rttxQBXnQ7qaYE8gUZYyYufsBAaePsmu5KMSfJF");
+    console.log(event.target.files[0]);
+    
+    fetch('http://127.0.0.1:8000/api/Image/', {
+        method: 'POST',
+      
+        body: formData
+    })
+    .then((response) => {
+
+        addTT();
+        
+    })
+    .catch(error => console.log(error));
+
+    
+
+
+    
+
+
+
+
+}
+}
+
+
 const onAddbtnClick=(e)=>{
     
     var bodyFormData = new FormData();
@@ -48,7 +93,7 @@ const onAddbtnClick=(e)=>{
         .then(function (response) {
           //handle success
           console.log(response.data['text']);
-          setTodoList([...todolist,{id:uuidv4() , input: textInput,output: response.data['text2'] } ] ) ;
+          setTodoList([...todolist,{id:uuidv4() , input: textInput,output: response.data['text2'],ima:response.data['url'] } ] ) ;
           
         })
        
@@ -75,7 +120,11 @@ return (
                         <form>
                 <textarea value={textInput}  onChange={TextInputChange} >
                 </textarea>
-             <Image/>
+                <label for="file-input" >
+                <img src={"https://www.clipartmax.com/png/middle/145-1454284_software-for-laser-cutting-engraving-icon-no-image-available.png"} style={{height:"80%" ,width:"50px"}} alt=''  />
+                <input id="file-input" type="file" style={{display:"none"}}  onChange={addFile} />  
+                </label>
+
                 <button  type='button' onClick={onAddbtnClick}  className=""><span className="glyphicon glyphicon-send"></span> </button>
                 </form>
 </div>

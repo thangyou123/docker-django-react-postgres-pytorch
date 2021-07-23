@@ -1,5 +1,6 @@
 from django.db import models
 
+import pathlib
 import pickle
 import joblib
 import json
@@ -12,8 +13,12 @@ import string
 import requests
 import regex as re
 from django.contrib import messages
+import tensorflow as tf
+from tensorflow import keras
+from PIL import Image
 pipeline= joblib.load("/app/backend/model/pipeline.pkl")
 label = joblib.load("/app/backend/model/label.pkl")
+modelll= tf.keras.models.load_model('model_image')
 class homepage(models.Model):
 	text=models.CharField(max_length=1000)
 	text2=models.CharField(max_length=1000)
@@ -21,7 +26,10 @@ class homepage(models.Model):
 	class Meta:
 		managed = True
 	def save(self, *args, **kwargs):
-		self.text2=Chat(self.text)
+		if self.text2=='Null':
+			self.text2=Chat(self.text,False)
+		else:
+			self.text2=Chat(self.text2,True)
 		super(homepage, self).save(*args, **kwargs)
 
 class ImageModel(models.Model):
@@ -31,8 +39,18 @@ class ImageModel(models.Model):
         managed = True
 
     def save(self, *args, **kwargs):
-        homepage.objects.create(text='Null',text2='Null',url="http://127.0.0.1:8000"+self.image.url)
+       
+        img=(Image.open(self.image)).resize((180,180))
+        img_array = keras.preprocessing.image.img_to_array(img)
+        img_array = tf.expand_dims(img_array, 0) 
+        predictions = modelll.predict(img_array)
+        score = tf.nn.softmax(predictions[0])
+        class_names=['Đầm lưới', 'Đầm nude', 'Đầm Nút', 'Đầm vest']
+        homepage.objects.create(text='Null',text2=class_names[np.argmax(score)],url="http://127.0.0.1:8000"+self.image.url)
         super(ImageModel, self).save(*args, **kwargs)
+        
+		
+       
 
 class ProductModel(models.Model):
     Name=models.CharField(max_length=1000)
@@ -51,6 +69,8 @@ class ConversationModel(models.Model):
     Height=models.CharField(max_length=1000,null=True,blank=True)
     Width=models.CharField(max_length=1000,null=True,blank=True)
     Number=models.IntegerField(null=True,blank=True)
+    Waist=models.CharField(max_length=1000,null=True,blank=True)
+    Ass=models.CharField(max_length=1000,null=True,blank=True)
     class Meta:
         managed = True
   
@@ -390,13 +410,13 @@ def predictEntity(text):
 def predict(text):
 	t=predictEntity(text)
 	if t['Number']>0: 
-		u='Dạ mẫu này bên em còn các size là: '+t['Size']+' Còn các loại màu: '+t['Color']+' Giá là 10000k'+' Chị muốn mua size nào hay cần tư size hong ạ'
-		ConversationModel.objects.create(Number=1,NameProduct=t['Name'],Attribute=t['Attribute'],Size='Null',Color='Null',Name='Null',Height='Null',Width='Null')
+		u='Dạ mẫu '+t['Name']+' này bên em còn các size là: '+t['Size']+' Còn các loại màu: '+t['Color']+' Giá là 10000k'+' Chị cho em xin thông tin chiều cao cân nặng để tư vấn cần tư size ạ'
+		ConversationModel.objects.create(Number=1,NameProduct=t['Name'],Attribute=t['Attribute'],Size='Null',Color='Null',Name='Null',Height='Null',Width='Null',Ass='Null',Waist='Null')
 	else:
 		u='Dạ mẫu này bên em hết hàng rồi ạ, chị có thể vui lòng chọn mẫu khác được không ạ'
 	return u
 
-def Chat(text):
+def Chat(text,ok):
 	t=approvereject(text)
 	z=False
 	u='NuLL'
@@ -407,16 +427,159 @@ def Chat(text):
 				u=i
 				z=True
 	if t=='Hello':
-	
 		return 'Dạ shop chào chị ạ chị muốn tư vấn sản phẩm nào ạ'
-	elif t=='Other':
-		return 'Dạ xin lỗi em chưa hiểu ý chị ạ'
-	elif  z:
-		t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
-		name=t2[len(t2)-1]['Name']
-		ConversationModel.objects.filter(Name=name).update(Size=u)
-		return "Dạ chị chọn size "+ u + " ạ."
+	elif t=='Inform':
+		if 'mông' in text.split():
+			return HandelAss(text)
+		if 'eo' in text.split():
+			return HandelWaist(text)
+		if 'cao' in text.split():
+			pattern ='^1m[0-9]*'
+			for item in text.split():
+				if re.match(pattern, item):
+					UpdateNumber()
+					UpdateHeight(item)
+					break
+		if 'nặng' in text.split():
+			pattern1 ='[0-9]*kg$'
+			pattern2 ='[0-9]* kg'
+			pattern3 ='[0-9]* kí'
+			v=''
+			t1=re.search(pattern1, text)
+			if t1:
+				v=t1.group()
+			t2=re.search(pattern2,text)
+			if t2:
+				v=t2.group()
+			t3=re.search(pattern3, text)
+			if t3:
+				v=t3.group()
+			if v!='':
+				UpdateNumber()
+				UpdateWidth(v)
+		if GetLastHeight()=='Null' and GetLastWidth()=="Null":
+			return "Chị cho em xin chiều cao và cân nặng ạ"
+		if GetLastHeight()=='Null':
+			return "Chị cho em xin chiều cao ạ"
+		if GetLastWidth()=="Null":
+			return "Chị cho em xin cân nặng ạ"
+		return findSize(text)
+	elif  z and t=='Order':
+		UpdateSize(u)
+		return "Dạ chị chọn size "+ u + " ạ."	
 
-	
 	else:
-		return predict(text)
+
+		if ok:
+			return predict(text)
+		if GetLastNumber()<3:
+			if GetLastHeight()=='Null':
+				return "Chị cho em xin chiều cao ạ"
+			if GetLastWidth()=="Null":
+				return "Chị cho em xin cân nặng ạ"
+		if 'k' in text.split() or 'không' in text.split() or 'ko' in text.split():
+			if GetLastNumber()==3:
+				UpdateNumber()
+				return "Vậy Chị cho em hỏi số đo mông ạ"
+			if GetLastNumber()==4:
+				UpdateNumber()
+				return CusSize()
+		return 'Dạ xin lỗi em chưa hiểu ý chị ạ'
+
+
+def UpdateSize(text):
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Size=text)
+def UpdateHeight(text):
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Height=text)
+
+def UpdateWidth(text):
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Width=text)
+
+def UpdateAss(text):
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Ass=text)
+
+def UpdateWaist(text):
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Waist=text)
+
+def UpdateNumber():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	name=t2[len(t2)-1]['Name']
+	ConversationModel.objects.filter(Name=name).update(Number=Number+1)
+
+def GetLastSize():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Size']
+	
+
+def GetLastHeight():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Height']
+	
+
+def GetLastWidth():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Width']
+def GetLastWaist():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Waist']
+def GetLastAss():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Ass']
+def GetLastNumber():
+	t2=requests.get('http://127.0.0.1:8000/api/Conversation/').json()
+	return t2[len(t2)-1]['Number']	
+
+
+def findSize(text):
+	UpdateNumber()
+	return "Chị cho em hỏi số đo eo ạ"
+
+def HandelWaist(text):
+
+	pattern1 ='[0-9]*cm$'
+	pattern2 ='[0-9]* cm'
+	pattern3 ='[0-9]* cen'
+	v=''
+	t1=re.search(pattern1, text)
+	if t1:
+		v=t1.group()
+	t2=re.search(pattern2,text)
+	if t2:
+		v=t2.group()
+	t3=re.search(pattern3, text)
+	if t3:
+		v=t3.group()
+	if v!='':
+		UpdateWaist(v)
+		UpdateNumber()
+	return "Chị cho em hỏi số đo mông ạ"
+def HandelAss(text):
+	pattern1 ='[0-9]*cm$'
+	pattern2 ='[0-9]* cm'
+	pattern3 ='[0-9]* cen'
+	v=''
+	t1=re.search(pattern1, text)
+	if t1:
+		v=t1.group()
+	t2=re.search(pattern2,text)
+	if t2:
+		v=t2.group()
+	t3=re.search(pattern3, text)
+	if t3:
+		v=t3.group()
+	if v!='':
+		UpdateAss(v)
+		UpdateNumber()
+	return CusSize()
+def CusSize():
+	return "size của chị là size S ạ"
